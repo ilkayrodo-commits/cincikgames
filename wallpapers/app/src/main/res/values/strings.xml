@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Cincik Duvar</string>
+    <string name="wallpaper_description">10 hareketli duvar kağıdı. Seçmek için ayarlara dokun.</string>
+    <string name="gallery_subtitle">10 hareketli duvar kağıdı · Önizlemek için dokun</string>
+    <string name="apply">Uygula</string>
+    <string name="applied">Uygulandı ✓</string>
+    <string name="in_use">✓ Kullanılıyor</string>
+    <string name="back">‹ Geri</string>
+    <string name="touch_hint">Ekrana dokunmayı dene</string>
+    <string name="no_live_wallpaper">Bu telefon canlı duvar kağıdı seçme ekranını açamadı. Ayarlar → Duvar kağıdı → Canlı duvar kağıtları\'ndan \"Cincik Duvar\"ı seç.</string>
+    <string name="set_hint">Açılan ekranda \"Duvar kağıdı olarak ayarla\"ya dokun.</string>
+</resources>

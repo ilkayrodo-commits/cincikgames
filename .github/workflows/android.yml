@@ -29,25 +29,34 @@ jobs:
       - name: Test
         run: gradle --no-daemon :app:testDebugUnitTest
 
-      - name: Build APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Build APKs
+        run: |
+          gradle --no-daemon :app:assembleDebug
+          (cd wallpapers && gradle --no-daemon :app:assembleDebug)
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk CincikNot.apk
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk CincikNot.apk
+          cp wallpapers/app/build/outputs/apk/debug/app-debug.apk CincikDuvar.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CincikNot-apk
-          path: CincikNot.apk
+          name: apks
+          path: |
+            CincikNot.apk
+            CincikDuvar.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Cincik Not (derleme ${{ github.run_number }})
+          name: Cincik uygulamaları (derleme ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           make_latest: "true"
           body: |
-            Telefona kurmak için aşağıdaki **CincikNot.apk** dosyasına dokun.
+            - **CincikDuvar.apk**: 10 hareketli duvar kağıdı
+            - **CincikNot.apk**: el yazısı / ses ile not
             Commit: ${{ github.sha }}
-          files: CincikNot.apk
+          files: |
+            CincikNot.apk
+            CincikDuvar.apk

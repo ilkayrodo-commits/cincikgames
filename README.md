@@ -16,3 +16,28 @@ Her push'ta GitHub Actions APK'yı derleyip bir Release olarak yayınlar:
 https://github.com/ilkayrodo-commits/cincikgames/releases/latest
 
 `app/debug.keystore.b64` (derlemede `debug.keystore` olarak açılır) yalnızca test imzası içindir (her derleme aynı imzayla çıksın, güncelleme kaldırmadan kurulabilsin diye).
+
+---
+
+# Cincik Duvar (`wallpapers/`)
+
+10 hareketli Android canlı duvar kağıdı. Galeride dokun → tam ekran önizle → **Uygula**.
+
+| | Sahne | Hareket |
+|---|---|---|
+| 1 | Galata Saçları | Kullanıcının duvar kağıdı: saçlar tel yönünde dalgalanır, martılar uçar, yıldız tozu parıldar. Dokununca saçlar itilir. |
+| 2 | İstanbul Gecesi | Hilal, aydınlatılmış camiler, boğazda yansımalar, geçen vapur |
+| 3 | Kuzey Işıkları | Karlı dağlar, göl yansıması, aurora perdeleri |
+| 4 | Retro Gün Batımı | Neon ızgara, çizgili güneş |
+| 5 | Derin Uzay | Akan bulutsu, kayan yıldızlar |
+| 6 | Yağmurlu Cam | Kayan damlalar, bulanık şehir ışıkları; dokununca cam silinir |
+| 7 | Okyanus Altı | Işık huzmeleri, kostikler, kabarcıklar, yosunlar |
+| 8 | Sakura | Süzülen kiraz yaprakları |
+| 9 | Altın Mermer | Akan altın damarlar; dokununca girdap |
+| 10 | Lav Lambası | Birleşip ayrılan damlalar |
+
+- Sahneler `app/src/main/assets/shaders/*.frag` (GLSL ES 1.0, ortak başlık `common.glsl`).
+- Galata görüntüsü `tools/clean_galata.py` ile ekran görüntüsündeki saat/tarih/simgelerden temizlendi,
+  hareket haritası `tools/galata_flowmap.py` ile üretildi (saç ağırlığı + tel yönü, kule sabit).
+- `tools/render_shader.js`: sahneleri başsız Chromium'da WebGL ile çizer (önizleme/küçük resim).
+- Pil için ~30 fps, görünmezken durur; ağır sahneler düşük çözünürlükte çizilip büyütülür.
