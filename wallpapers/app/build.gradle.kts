@@ -11,8 +11,8 @@ android {
         applicationId = "com.cincikgames.duvar"
         minSdk = 26
         targetSdk = 34
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "3").toInt()
-        versionName = "0.3." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "4").toInt()
+        versionName = "0.4." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     signingConfigs {

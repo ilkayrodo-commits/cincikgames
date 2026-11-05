@@ -3,7 +3,7 @@
 Çıktılar (yarım çözünürlük PNG):
   flow.png  R = 0.5*(1 + saç - gökyüzü)   (gökyüzü 0, kule 0.5, saç 1)
             G,B = yönlü akış vektörü * 0.5 + 0.5  (tel boyunca, tutarlı işaretli)
-  aux.png   R = kule maskesi, G = pencere maskesi, B = saç bandı (kule önünde)
+  aux.png   R = paralaks katmanı, G = hareket ağırlığı, B = saç bandı (kule önünde)
 
 Tel yönünün işareti (ileri/geri) yapı tensöründen gelmez; komşular arasında en
 iyi hizalanandan başlayarak yayılan bir ağaç (Prim) ile tutarlı hale getirilir,
@@ -136,7 +136,18 @@ FY = cv2.GaussianBlur(up(fy * strength), (0, 0), 1.5)
 
 half = lambda a: cv2.resize(a, (hw, hh), interpolation=cv2.INTER_AREA)
 flow = np.dstack([FY * 0.5 + 0.5, FX * 0.5 + 0.5, half(0.5 * (1 + hair - sky))])
-aux = np.dstack([half(band), half(windows), half(tower_soft)])
+# Hareket ağırlığı: kule taşından (saç bantları hariç) uzaklaştıkça 0 -> 1.
+# Kenarda yumuşak bir rampa (~80 px) olduğu için hareket hiçbir yerde kopmaz.
+static = (tower_hard > 0) & ~(cv2.GaussianBlur(band, (0, 0), 1) > 0.5)
+dist = ndimage.distance_transform_edt(~static).astype(np.float32)
+ramp = np.clip(dist / 80.0, 0, 1)
+ramp = ramp * ramp * (3 - 2 * ramp)
+hair_near = np.clip(cv2.GaussianBlur(hair, (0, 0), 45) * 1.5, 0, 1)
+motion = ramp * (0.25 + 0.75 * hair_near)
+motion = cv2.GaussianBlur(motion, (0, 0), 4)
+# Paralaks katmanı: çok yumuşak (keskin farklar eğince yırtılma yapar).
+layer = cv2.GaussianBlur(np.clip(hair * ramp, 0, 1), (0, 0), 40)
+aux = np.dstack([half(band), half(motion), half(layer)])
 cv2.imwrite(out_flow, np.clip(flow * 255 + 0.5, 0, 255).astype(np.uint8))
 cv2.imwrite(out_aux, np.clip(aux * 255 + 0.5, 0, 255).astype(np.uint8))
 

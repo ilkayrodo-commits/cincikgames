@@ -19,7 +19,7 @@ data class WallpaperDef(
 
 object Wallpapers {
     val all = listOf(
-        WallpaperDef("galata", "Galata Saçları", "Zeminden gökyüzüne yükselen saç spirali · telefonu eğ, dokun",
+        WallpaperDef("galata", "Galata Saçları", "Kuleyi saran saçlar bütün halinde dalgalanır · telefonu eğ, dokun",
             "galata", listOf("textures/galata.jpg", "textures/galata_flow.png", "textures/galata_aux.png"), 1.0f, usesTilt = true),
         WallpaperDef("istanbul", "İstanbul Gecesi", "Hilal, aydınlatılmış camiler, boğazda vapur", "istanbul", renderScale = 0.75f),
         WallpaperDef("aurora", "Kuzey Işıkları", "Karlı dağlar ve gölde dans eden aurora", "aurora", renderScale = 0.5f),
