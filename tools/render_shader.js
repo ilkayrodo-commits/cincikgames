@@ -11,7 +11,7 @@ const touch = touchArg ? touchArg.split(',').map(Number) : [-9999, -9999, 999];
 
 const common = fs.readFileSync(path.join(ASSETS, 'shaders/common.glsl'), 'utf8');
 const frag = common + '\n' + fs.readFileSync(path.join(ASSETS, `shaders/${name}.frag`), 'utf8');
-const texFor = { galata: ['textures/galata.jpg', 'textures/galata_flow.png'] }[name] || [];
+const texFor = { galata: ['textures/galata.jpg', 'textures/galata_flow.png', 'textures/galata_aux.png'] }[name] || [];
 const texData = texFor.map(f => {
   const ext = f.endsWith('.png') ? 'png' : 'jpeg';
   return `data:image/${ext};base64,` + fs.readFileSync(path.join(ASSETS, f)).toString('base64');
@@ -19,6 +19,7 @@ const texData = texFor.map(f => {
 
 const html = `<html><body style="margin:0;background:#000"><canvas id=c width=${W} height=${H}></canvas>
 <script>
+window.TILT = [Number(new URLSearchParams(location.search).get('tx')||0), 0];
 window.renderAt = async (fragSrc, texUrls, t, touch) => {
   const c = document.getElementById('c');
   const gl = c.getContext('webgl', {preserveDrawingBuffer: true}); gl.getExtension('OES_standard_derivatives');
@@ -46,6 +47,7 @@ window.renderAt = async (fragSrc, texUrls, t, touch) => {
   gl.uniform1f(gl.getUniformLocation(p, 'u_time'), t);
   gl.uniform3f(gl.getUniformLocation(p, 'u_touch'), touch[0], touch[1], touch[2]);
   gl.uniform1f(gl.getUniformLocation(p, 'u_offset'), 0.5);
+  gl.uniform2f(gl.getUniformLocation(p, 'u_tilt'), (window.TILT||[0,0])[0], (window.TILT||[0,0])[1]);
   gl.uniform2f(gl.getUniformLocation(p, 'u_tex0Size'), size[0], size[1]);
   gl.viewport(0, 0, c.width, c.height);
   const t0 = performance.now();

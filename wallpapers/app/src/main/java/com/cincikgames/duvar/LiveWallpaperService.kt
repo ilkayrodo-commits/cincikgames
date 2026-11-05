@@ -30,6 +30,7 @@ class LiveWallpaperService : WallpaperService() {
         private var lastFrameNs = 0L
         private var screenW = 1
         private var screenH = 1
+        private lateinit var tilt: TiltTracker
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
@@ -44,12 +45,17 @@ class LiveWallpaperService : WallpaperService() {
                 setRenderer(renderer)
                 renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
             }
+            tilt = TiltTracker(ctx) { x, y ->
+                renderer.tiltX = x
+                renderer.tiltY = y
+            }
             setTouchEventsEnabled(true)
             Wallpapers.prefs(ctx).registerOnSharedPreferenceChangeListener(this)
         }
 
         override fun onDestroy() {
             Choreographer.getInstance().removeFrameCallback(this)
+            tilt.stop()
             Wallpapers.prefs(this@LiveWallpaperService).unregisterOnSharedPreferenceChangeListener(this)
             glView?.release()
             glView = null
@@ -60,10 +66,12 @@ class LiveWallpaperService : WallpaperService() {
             this.visible = visible
             val v = glView ?: return
             if (visible) {
+                if (def.usesTilt) tilt.start()
                 v.onResume()
                 Choreographer.getInstance().removeFrameCallback(this)
                 Choreographer.getInstance().postFrameCallback(this)
             } else {
+                tilt.stop()
                 Choreographer.getInstance().removeFrameCallback(this)
                 v.onPause()
             }
@@ -96,6 +104,9 @@ class LiveWallpaperService : WallpaperService() {
             if (newDef.id == def.id) return
             def = newDef
             applySurfaceScale()
+            if (newDef.usesTilt && visible) tilt.start() else tilt.stop()
+            renderer.tiltX = 0f
+            renderer.tiltY = 0f
             glView?.queueEvent { renderer.setWallpaper(newDef) }
         }
 

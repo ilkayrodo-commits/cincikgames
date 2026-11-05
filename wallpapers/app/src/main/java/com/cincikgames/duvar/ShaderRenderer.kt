@@ -30,6 +30,10 @@ class ShaderRenderer(private val context: Context, initial: WallpaperDef) : GLSu
     /** Ana ekran sayfa kaydırma (0..1). */
     @Volatile var offset = 0.5f
 
+    /** Telefon eğimi (-1..1). */
+    @Volatile var tiltX = 0f
+    @Volatile var tiltY = 0f
+
     @Volatile private var touchNX = -10f
     @Volatile private var touchNY = -10f
     @Volatile private var touchAtNs = 0L
@@ -84,6 +88,7 @@ class ShaderRenderer(private val context: Context, initial: WallpaperDef) : GLSu
         GLES20.glUniform1f(loc("u_time"), t)
         GLES20.glUniform3f(loc("u_touch"), touchNX * width, (1f - touchNY) * height, touchAge)
         GLES20.glUniform1f(loc("u_offset"), offset)
+        GLES20.glUniform2f(loc("u_tilt"), tiltX, tiltY)
         GLES20.glUniform2f(loc("u_tex0Size"), tex0W, tex0H)
         for (i in textures.indices) {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + i)

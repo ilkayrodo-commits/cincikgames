@@ -25,12 +25,17 @@ class PreviewActivity : AppCompatActivity() {
     private lateinit var glView: GLSurfaceView
     private lateinit var renderer: ShaderRenderer
     private lateinit var def: WallpaperDef
+    private lateinit var tilt: TiltTracker
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         def = Wallpapers.byId(intent.getStringExtra(EXTRA_ID))
         renderer = ShaderRenderer(this, def)
+        tilt = TiltTracker(this) { x, y ->
+            renderer.tiltX = x
+            renderer.tiltY = y
+        }
         glView = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
             setRenderer(renderer)
@@ -99,9 +104,11 @@ class PreviewActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         glView.onResume()
+        if (def.usesTilt) tilt.start()
     }
 
     override fun onPause() {
+        tilt.stop()
         glView.onPause()
         super.onPause()
     }

@@ -25,7 +25,7 @@ https://github.com/ilkayrodo-commits/cincikgames/releases/latest
 
 | | Sahne | Hareket |
 |---|---|---|
-| 1 | Galata Saçları | Kullanıcının duvar kağıdı: saçlar tel yönünde dalgalanır, martılar uçar, yıldız tozu parıldar. Dokununca saçlar itilir. |
+| 1 | Galata Saçları | Kullanıcının duvar kağıdı: saçlar tel yönünde akar ve savrulur, kuleyi saran tutamlar dönerek önünden/arkasından geçer, pencerelerde mum ışığı, gökyüzünde savrulan teller ve martılar. Telefonu eğince derinlik (paralaks), dokununca saçlar itilir. |
 | 2 | İstanbul Gecesi | Hilal, aydınlatılmış camiler, boğazda yansımalar, geçen vapur |
 | 3 | Kuzey Işıkları | Karlı dağlar, göl yansıması, aurora perdeleri |
 | 4 | Retro Gün Batımı | Neon ızgara, çizgili güneş |
@@ -38,6 +38,7 @@ https://github.com/ilkayrodo-commits/cincikgames/releases/latest
 
 - Sahneler `app/src/main/assets/shaders/*.frag` (GLSL ES 1.0, ortak başlık `common.glsl`).
 - Galata görüntüsü `tools/clean_galata.py` ile ekran görüntüsündeki saat/tarih/simgelerden temizlendi,
-  hareket haritası `tools/galata_flowmap.py` ile üretildi (saç ağırlığı + tel yönü, kule sabit).
+  haritalar `tools/galata_maps.py` ile üretildi: yönlü tel akışı (işaret tutarlılığı için Prim yayılımı),
+  saç/gökyüzü/kule ayrımı, kuleyi saran bantlar ve pencereler.
 - `tools/render_shader.js`: sahneleri başsız Chromium'da WebGL ile çizer (önizleme/küçük resim).
 - Pil için ~30 fps, görünmezken durur; ağır sahneler düşük çözünürlükte çizilip büyütülür.

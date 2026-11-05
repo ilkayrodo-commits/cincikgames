@@ -13,6 +13,8 @@ uniform vec3 u_touch;      // xy: son dokunma (piksel, y yukarı), z: dokunmadan
 uniform float u_offset;    // ana ekran sayfa kaydırma 0..1
 uniform sampler2D u_tex0;
 uniform sampler2D u_tex1;
+uniform sampler2D u_tex2;
+uniform vec2 u_tilt;       // telefon eğimi, yaklaşık -1..1 (sağa/yukarı eğim +)
 uniform vec2 u_tex0Size;
 varying vec2 v_uv;
 

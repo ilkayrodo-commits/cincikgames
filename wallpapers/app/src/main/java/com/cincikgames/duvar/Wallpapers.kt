@@ -13,12 +13,14 @@ data class WallpaperDef(
     val shader: String,
     val textures: List<String> = emptyList(),
     val renderScale: Float = 0.6f,
+    /** Telefon eğimine göre derinlik (paralaks) kullanır mı. */
+    val usesTilt: Boolean = false,
 )
 
 object Wallpapers {
     val all = listOf(
-        WallpaperDef("galata", "Galata Saçları", "Senin duvar kağıdın: dalgalanan saçlar, martılar, yıldız tozu",
-            "galata", listOf("textures/galata.jpg", "textures/galata_flow.png"), 1.0f),
+        WallpaperDef("galata", "Galata Saçları", "Kuleyi saran, akan ve dalgalanan saçlar · telefonu eğ, dokun",
+            "galata", listOf("textures/galata.jpg", "textures/galata_flow.png", "textures/galata_aux.png"), 1.0f, usesTilt = true),
         WallpaperDef("istanbul", "İstanbul Gecesi", "Hilal, aydınlatılmış camiler, boğazda vapur", "istanbul", renderScale = 0.75f),
         WallpaperDef("aurora", "Kuzey Işıkları", "Karlı dağlar ve gölde dans eden aurora", "aurora", renderScale = 0.5f),
         WallpaperDef("synthwave", "Retro Gün Batımı", "80'ler neon ızgara ve çizgili güneş", "synthwave", renderScale = 0.75f),
