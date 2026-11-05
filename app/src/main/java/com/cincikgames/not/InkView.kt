@@ -9,7 +9,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.digitalink.Ink
+import com.google.mlkit.vision.digitalink.recognition.Ink
 
 /** Parmakla yazılan çizgileri hem ekrana çizer hem de ML Kit için Ink olarak toplar. */
 class InkView @JvmOverloads constructor(
