@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Minik Gezgin</string>
+    <string name="perm_title">Merhaba! 👋</string>
+    <string name="perm_text">Minik Gezgin\'in ana ekranında dolaşabilmesi için \"Diğer uygulamaların üzerinde göster\" iznine ihtiyacı var.\n\nAçılan ekranda Minik Gezgin\'i bulup izni aç, sonra geri dön.</string>
+    <string name="perm_button">İzni aç</string>
+    <string name="perm_xiaomi">Xiaomi / Redmi / POCO telefonlarda ayrıca: Uygulama bilgisi → Diğer izinler → \"Arka planda açılır pencereleri göster\" seçeneğini de aç.</string>
+    <string name="notif_channel">Minik Gezgin</string>
+    <string name="notif_text">Ekranında geziyor. Kapatmak için tutup ✕\'e sürükle.</string>
+    <string name="notif_close">Kapat</string>
+</resources>

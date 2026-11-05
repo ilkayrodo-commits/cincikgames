@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.Gezgin" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">#D97757</item>
+        <item name="colorAccent">#D97757</item>
+        <item name="android:windowBackground">#14161C</item>
+        <item name="android:statusBarColor">#14161C</item>
+        <item name="android:navigationBarColor">#14161C</item>
+    </style>
+</resources>

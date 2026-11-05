@@ -33,11 +33,13 @@ jobs:
         run: |
           gradle --no-daemon :app:assembleDebug
           (cd wallpapers && gradle --no-daemon :app:assembleDebug)
+          (cd buddy && gradle --no-daemon :app:assembleDebug)
 
       - name: Rename APKs
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk CincikNot.apk
           cp wallpapers/app/build/outputs/apk/debug/app-debug.apk CincikDuvar.apk
+          cp buddy/app/build/outputs/apk/debug/app-debug.apk MinikGezgin.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -45,6 +47,7 @@ jobs:
           path: |
             CincikNot.apk
             CincikDuvar.apk
+            MinikGezgin.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -56,7 +59,9 @@ jobs:
           body: |
             - **CincikDuvar.apk**: 10 hareketli duvar kağıdı
             - **CincikNot.apk**: el yazısı / ses ile not
+            - **MinikGezgin.apk**: ekranda gezen piksel karakter
             Commit: ${{ github.sha }}
           files: |
             CincikNot.apk
             CincikDuvar.apk
+            MinikGezgin.apk

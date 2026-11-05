@@ -42,3 +42,15 @@ https://github.com/ilkayrodo-commits/cincikgames/releases/latest
   rampayla sıfıra inen hareket ağırlığı ve yumuşak paralaks katmanı.
 - `tools/render_shader.js`: sahneleri başsız Chromium'da WebGL ile çizer (önizleme/küçük resim).
 - Pil için ~30 fps, görünmezken durur; ağır sahneler düşük çözünürlükte çizilip büyütülür.
+
+---
+
+# Minik Gezgin (`buddy/`)
+
+Ekranda keyfine göre dolaşan turuncu piksel karakter (Claude Code'un yürüyen karakterinden esinlenen özgün çizim).
+
+- Simgeye dokun → karakter ekrana çıkar: yürür, durup bakınır, göz kırpar, zıplar, oturur, uyuklar (z z z).
+- Karaktere dokun → kalple zıplar.
+- Tutup sürükle → ekranın üstünde **✕** belirir; oraya bırak → küçülerek kapanır. Simgeye tekrar dokununca geri gelir.
+- "Diğer uygulamaların üzerinde göster" izni gerekir (ilk açılışta yönlendirir). Ekran kapanınca durur.
+- Kareler `app/src/main/assets/sprites.txt` dosyasında (16 sütun, metin olarak); `tools/sprite_preview.py` ile önizlenir.
