@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="6dp"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/note"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@null"
+        android:gravity="top|start"
+        android:hint="@string/note_hint"
+        android:importantForAutofill="no"
+        android:inputType="textMultiLine|textCapSentences"
+        android:textSize="20sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button android:id="@+id/btn_mic" style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginEnd="4dp" android:text="@string/btn_mic" />
+        <Button android:id="@+id/btn_calc" style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginEnd="4dp" android:text="@string/btn_calc" />
+        <Button android:id="@+id/btn_copy" style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="@string/btn_copy" />
+    </LinearLayout>
+
+    <com.cincikgames.not.InkView
+        android:id="@+id/pad"
+        android:layout_width="match_parent"
+        android:layout_height="230dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/pad_bg" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button android:id="@+id/btn_keyboard" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/btn_keyboard" />
+        <Button android:id="@+id/btn_space" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="@string/btn_space" />
+        <Button android:id="@+id/btn_enter" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/btn_enter" />
+        <Button android:id="@+id/btn_back" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/btn_back" />
+        <Button android:id="@+id/btn_clear_pad" style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/btn_clear_pad" />
+    </LinearLayout>
+</LinearLayout>

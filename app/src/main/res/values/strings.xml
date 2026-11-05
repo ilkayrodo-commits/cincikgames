@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">Cincik Not</string>
+    <string name="widget_name">Cincik Not</string>
+    <string name="widget_empty">Henüz not yok. Yaz ya da konuş.</string>
+    <string name="widget_write">✍ Yaz</string>
+    <string name="widget_speak">🎤 Konuş</string>
+    <string name="note_hint">Notun burada metin olarak görünecek…</string>
+    <string name="pad_hint">Buraya parmağınla yaz ✍</string>
+    <string name="btn_mic">🎤 Konuş</string>
+    <string name="btn_calc">= Hesapla</string>
+    <string name="btn_copy">⧉ Kopyala</string>
+    <string name="btn_space">Boşluk</string>
+    <string name="btn_enter">↵</string>
+    <string name="btn_back">⌫</string>
+    <string name="btn_clear_pad">Çizimi sil</string>
+    <string name="btn_keyboard">⌨</string>
+    <string name="status_downloading">El yazısı modeli indiriliyor (yalnızca ilk açılışta, internet gerekir)…</string>
+    <string name="status_ready">Hazır. Aşağıdaki alana yaz; elini kaldırınca metne dönüşür.</string>
+    <string name="status_wait_model">Model henüz hazır değil, biraz bekle…</string>
+    <string name="status_no_model">Türkçe el yazısı modeli bulunamadı.</string>
+    <string name="status_download_failed">Model indirilemedi: %1$s</string>
+    <string name="status_recognize_failed">Tanıma başarısız: %1$s</string>
+    <string name="status_not_understood">Anlaşılamadı, tekrar dene.</string>
+    <string name="status_speech_done">✓ Konuşma metne eklendi.</string>
+    <string name="status_calc_done">✓ Sonuç: %1$s</string>
+    <string name="speech_prompt">Konuş, metne çevireyim…</string>
+    <string name="speech_missing">Bu telefonda ses tanıma hizmeti bulunamadı (Google uygulaması gerekli).</string>
+    <string name="copied">Not panoya kopyalandı</string>
+    <string name="clear_note_question">Notun tamamı silinsin mi?</string>
+    <string name="clear_note_yes">Sil</string>
+    <string name="cancel">Vazgeç</string>
+</resources>

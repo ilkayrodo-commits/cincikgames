@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Kağıt -->
+    <path android:fillColor="#FFFFFF" android:pathData="M34,28h40a4,4 0,0 1,4 4v44a4,4 0,0 1,-4 4h-40a4,4 0,0 1,-4 -4v-44a4,4 0,0 1,4 -4z" />
+    <!-- Satırlar -->
+    <path android:strokeColor="#C5CAE9" android:strokeWidth="2" android:pathData="M38,44h32M38,54h32M38,64h20" />
+    <!-- El yazısı dalgası -->
+    <path android:strokeColor="#3D5AFE" android:strokeWidth="3.5" android:strokeLineCap="round"
+        android:pathData="M38,52c3,-8 6,-8 8,0s5,8 8,0s5,-8 8,0" />
+</vector>

@@ -1,0 +1,9 @@
+<resources>
+    <color name="brand">#3D5AFE</color>
+    <color name="pad">#FFFDF5</color>
+    <color name="pad_border">#C9C3B0</color>
+    <color name="ink">#1A237E</color>
+    <color name="hint">#A8A290</color>
+    <color name="widget_bg">#F2FFFFFF</color>
+    <color name="widget_text">#212121</color>
+</resources>
