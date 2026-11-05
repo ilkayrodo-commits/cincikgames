@@ -25,7 +25,7 @@ https://github.com/ilkayrodo-commits/cincikgames/releases/latest
 
 | | Sahne | Hareket |
 |---|---|---|
-| 1 | Galata Saçları | Kullanıcının duvar kağıdı: saçlar tel yönünde akar ve savrulur, kuleyi saran tutamlar dönerek önünden/arkasından geçer, pencerelerde mum ışığı, gökyüzünde savrulan teller ve martılar. Telefonu eğince derinlik (paralaks), dokununca saçlar itilir. |
+| 1 | Galata Saçları | Kullanıcının duvar kağıdı: saçlar zeminden başlayıp kulenin etrafında dönerek gökyüzüne yükselen bir spiral çizer; tüm saç kütlesi yukarı akar ve burgu gibi döner, tepede girdap gibi açılır. Kule sabit. Telefonu eğince derinlik (paralaks), dokununca saçlar itilir. |
 | 2 | İstanbul Gecesi | Hilal, aydınlatılmış camiler, boğazda yansımalar, geçen vapur |
 | 3 | Kuzey Işıkları | Karlı dağlar, göl yansıması, aurora perdeleri |
 | 4 | Retro Gün Batımı | Neon ızgara, çizgili güneş |

@@ -1,11 +1,14 @@
-// Galata v2: kuleyi saran saçlar gerçekten akar ve dalgalanır.
+// Galata v3: saçlar zeminden başlayıp kulenin etrafında dönerek
+// gökyüzüne yükselen bir spiral çizer. Kule sabittir.
 //
 // u_tex0 = temizlenmiş görüntü
-// u_tex1 = akış haritası  R: 0.5*(1+saç-gökyüzü)  G,B: yönlü tel akışı (x, y)
-// u_tex2 = yardımcı harita R: kule  G: pencereler  B: kule önündeki saç bantları
+// u_tex1 = akış haritası  R: 0.5*(1+saç-gökyüzü)  G,B: yönlü tel akışı (yukarı doğru)
+// u_tex2 = yardımcı harita R: kule  B: kule önündeki saç bantları
 // (tools/galata_maps.py ile üretilir)
 
 const float PI = 3.14159265;
+const float AXIS_X = 612.0;     // kule ekseni (görüntü pikseli)
+const float RISE = 42.0;        // spiralin yükselme hızı (piksel/sn)
 
 vec2 coverUV(vec2 uv) {
     float sa = u_res.x / u_res.y;
@@ -61,31 +64,38 @@ float flock(vec2 P, float t, float seed, float dirSign, float yBase, float perio
     return cover;
 }
 
-// ------------------------------------- kulenin etrafında dönen serbest teller
-// side 0: ön yarı (kulenin önünden geçer), side 1: arka yarı (yalnızca gökyüzünde görünür)
-vec4 orbitStrands(vec2 px, float t, int side) {
-    float cx = 612.0;
-    float R = mix(150.0, 300.0, smoothstep(650.0, 1120.0, px.y)) + 18.0;
-    float u = (px.x - cx) / R;
+// Spiralin yarıçapı: zeminde geniş, kule gövdesini sarar, külahta daralır,
+// tepede gökyüzüne doğru girdap gibi açılır.
+float spiralRadius(float y) {
+    float r = mix(470.0, 330.0, smoothstep(2460.0, 1800.0, y));  // zemin -> gövde
+    r = mix(r, 170.0, smoothstep(1100.0, 600.0, y));              // gövde -> külah
+    r = mix(r, 430.0, smoothstep(520.0, 40.0, y));                // tepe: girdap açılır
+    return r;
+}
+
+// ------------------------- zeminden gökyüzüne kulenin etrafında yükselen tutamlar
+// side 0: ön yarı (her şeyin önünde), side 1: arka yarı (yalnızca gökyüzünde görünür)
+vec4 spiralStrands(vec2 px, float t, int side) {
+    float R = spiralRadius(px.y);
+    float u = (px.x - AXIS_X) / R;
     if (abs(u) > 1.0) return vec4(0.0);
     float th = asin(u);
     float ths = side == 0 ? th : PI - th;
-    float span = smoothstep(600.0, 760.0, px.y) * smoothstep(1760.0, 1480.0, px.y)
-               * smoothstep(1.0, 0.86, abs(u));   // yan kenarda yumuşakça arkaya dön
-    if (span <= 0.0) return vec4(0.0);
+    float span = smoothstep(30.0, 260.0, px.y) * smoothstep(1.0, 0.86, abs(u));
     vec4 acc = vec4(0.0);
-    for (int k = 0; k < 2; k++) {
+    for (int k = 0; k < 3; k++) {
         float fk = float(k);
-        float pitch = 560.0 + fk * 180.0;
-        // Sarmal aşağı kayar: tutam kulenin etrafında dönüyormuş gibi görünür.
-        float y0 = 640.0 + fk * 330.0 + t * (30.0 + fk * 10.0);
-        float wave = 22.0 * sin(ths * 2.0 + t * 0.9 + fk * 3.0) + 9.0 * sin(ths * 5.0 - t * 1.4);
+        float pitch = 760.0 + fk * 90.0;
+        // Sarmal yukarı kayar: tutamlar zeminden gökyüzüne dönerek çıkar.
+        float y0 = fk * 300.0 - t * (RISE + fk * 6.0);
+        float wave = 24.0 * sin(ths * 2.0 + t * 0.9 + fk * 3.0) + 10.0 * sin(ths * 5.0 - t * 1.4 + fk);
+        // Önde sola-yukarı / sağa-aşağı eğim: resimdeki kuleyi saran bantlarla aynı yön.
         float dy = px.y - (y0 + pitch * ths / (2.0 * PI) + wave);
         dy -= pitch * floor(dy / pitch + 0.5);
-        float H = 46.0 + 16.0 * fk + 10.0 * sin(ths * 1.5 + t * 0.5);
+        // yukarı çıktıkça incelir
+        float H = (40.0 + 14.0 * fk + 10.0 * sin(ths * 1.5 + t * 0.5)) * mix(0.6, 1.15, smoothstep(200.0, 2200.0, px.y));
         if (abs(dy) > H) continue;
         float v = dy / H;
-        // tutamın gövdesi: kenarlara doğru incelen koyu yarı saydam kütle
         float body = smoothstep(1.0, 0.45, abs(v));
         float fib = 0.0;
         float hi = 0.0;
@@ -95,8 +105,8 @@ vec4 orbitStrands(vec2 px, float t, int side) {
             float w = 0.030 + 0.025 * hash12(vec2(fj, fk));
             float line = smoothstep(w, w * 0.15, abs(v - off));
             fib = max(fib, line);
-            // her telde akan küçük parıltılar
-            float dash = smoothstep(0.55, 1.0, sin(ths * (14.0 + fj) - t * (2.5 + fj * 0.2) + fj * 7.0));
+            // tel boyunca akan parıltılar
+            float dash = smoothstep(0.55, 1.0, sin(ths * (14.0 + fj) + t * (2.5 + fj * 0.2) + fj * 7.0));
             hi = max(hi, line * dash * hash12(vec2(fj + 4.0, fk + 2.0)));
         }
         float depth = cos(ths);
@@ -111,26 +121,27 @@ vec4 orbitStrands(vec2 px, float t, int side) {
     return acc;
 }
 
-// ------------------------------------------- gökyüzünde savrulan serbest teller
+// ------------------------------------- gökyüzünde yukarı savrulan serbest teller
 vec4 wisps(vec2 P, float t) {
     float aspect = u_res.x / u_res.y;
     vec4 acc = vec4(0.0);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         float fi = float(i);
-        float period = 13.0 + fi * 2.7;
+        float period = 11.0 + fi * 2.3;
         float ph = fract(t / period + hash12(vec2(fi, 2.0)));
-        vec2 start = vec2(hash12(vec2(fi, 3.0)) * aspect, 0.45 + 0.5 * hash12(vec2(fi, 4.0)));
-        vec2 c = start + vec2(-0.25 + 0.5 * hash12(vec2(fi, 5.0)), -0.12) * ph;
-        float ang = -0.6 + 1.2 * hash12(vec2(fi, 6.0)) + 0.35 * sin(t * 0.4 + fi);
+        vec2 start = vec2(hash12(vec2(fi, 3.0)) * aspect, 0.30 + 0.45 * hash12(vec2(fi, 4.0)));
+        // kıvrılarak yükselir
+        vec2 c = start + vec2(0.10 * sin(ph * 6.2831 + fi), 0.32 * ph);
+        float ang = 0.9 + 0.5 * sin(ph * 6.2831 + fi * 2.0) + 0.4 * hash12(vec2(fi, 6.0));
         vec2 q = P - c;
         q = vec2(cos(ang) * q.x + sin(ang) * q.y, -sin(ang) * q.x + cos(ang) * q.y);
-        float L = 0.13 + 0.10 * hash12(vec2(fi, 7.0));
+        float L = 0.12 + 0.09 * hash12(vec2(fi, 7.0));
         if (abs(q.x) > L || abs(q.y) > 0.06) continue;
         float env = smoothstep(L, L * 0.55, abs(q.x));
-        float fade = smoothstep(0.0, 0.2, ph) * smoothstep(1.0, 0.75, ph);
+        float fade = smoothstep(0.0, 0.2, ph) * smoothstep(1.0, 0.7, ph);
         for (int f = 0; f < 3; f++) {
             float ff = float(f);
-            float y = 0.022 * sin(q.x * 28.0 - t * 2.4 + fi * 3.0 + ff * 0.8) * (0.4 + q.x / L * 0.6)
+            float y = 0.022 * sin(q.x * 28.0 + t * 2.4 + fi * 3.0 + ff * 0.8) * (0.4 + q.x / L * 0.6)
                       + ff * 0.0045 * (1.0 + q.x / L);
             float d = abs(q.y - y);
             float a = smoothstep(0.0011, 0.0, d) * env * fade * 0.9;
@@ -146,7 +157,7 @@ void main() {
     float t = u_time;
     vec2 size = u_tex0Size;
 
-    // --- kamera: hafif nefes alan yakınlaşma + eğim paralaksı için pay
+    // --- kamera: hafif nefes alan yakınlaşma + eğim paralaksı
     vec2 st = coverUV(v_uv);
     float zoom = 1.05 + 0.012 * sin(t * 0.16);
     st = 0.5 + (st - 0.5) / zoom;
@@ -159,28 +170,39 @@ void main() {
     vec3 aux = texture2D(u_tex2, st).rgb;
     float hair = hairOf(f.r);
     float sky = skyOf(f.r);
-    float tower = aux.r;
     float band = aux.b;
     vec2 fl = f.gb * 2.0 - 1.0;
-    vec2 nrm = vec2(-fl.y, fl.x);
+    vec2 px = st * size;
 
-    // --- büyük dalgalanma: saç kütleleri tellere dik yönde savrulur
-    vec2 q = st * vec2(1.0, size.y / size.x);
-    float ph = q.y * 3.2 + q.x * 1.4 - t * 1.05 + 1.6 * vnoise(q * 1.5 + t * 0.07);
-    float swayAmp = (15.0 * sin(ph) + 6.0 * sin(ph * 2.3 + 1.0 - t * 0.6)) * mix(1.0, 0.3, band);
-    vec2 iso = vec2(sin(ph * 0.9 + 0.5), cos(ph * 0.7)) * 0.35;
-    vec2 dispPx = (nrm + iso) * swayAmp * hair;
+    // --- tüm saç kütlesi: zeminden yukarı ilerleyen burgu dalgası.
+    // Her nokta küçük bir elips çizer; evre aşağıdan yukarı ve eksen etrafında
+    // kaydığı için bütün kütle kulenin etrafında dönerek yükseliyormuş gibi görünür.
+    float rel = (px.x - AXIS_X) / spiralRadius(px.y);
+    float k = 2.0 * PI / 820.0;
+    float ph = px.y * k + t * (RISE * k) * 1.6 - rel * 2.2;
+    ph += 0.9 * vnoise(st * vec2(3.0, 6.0) + vec2(0.0, t * 0.12));
+    float amp = 19.0 * mix(1.0, 0.55, band);
+    vec2 dispPx = vec2(sin(ph), 0.45 * cos(ph)) * amp;
+    // ikincil, daha hızlı kıvrım
+    float ph2 = px.y * k * 2.7 + t * 1.9 - rel * 3.0;
+    dispPx += vec2(sin(ph2), 0.5 * cos(ph2)) * 6.0;
+    dispPx *= hair;
 
     // --- dokunma: saçlar parmaktan itilir ve yaylanarak geri gelir
     vec2 tdir;
     float tp = touchPulse(gl_FragCoord.xy, u_res.y * 0.11, tdir);
     dispPx += vec2(tdir.x, -tdir.y) * tp * 42.0 * hair * cos(u_touch.z * 7.0);
 
-    // --- akış: teller kendi yönünde akar (iki fazlı akış haritası)
+    // Hareket kulenin üzerine taşmasın (kule önündeki saç bantları hariç).
+    vec3 auxD = texture2D(u_tex2, st + dispPx / size).rgb;
+    dispPx *= 1.0 - smoothstep(0.3, 0.7, auxD.r) * (1.0 - auxD.b);
+
+    // --- akış: teller kendi yönünde yukarı akar (iki fazlı akış haritası)
     vec2 base = st + dispPx / size;
-    float L = mix(58.0, 40.0, band);
+    float L = mix(60.0, 42.0, band);
+    vec2 q = st * vec2(1.0, size.y / size.x);
     float n0 = vnoise(q * 2.2) * 1.3;
-    float speed = 0.22;
+    float speed = 0.24;
     float p0 = fract(t * speed + n0);
     float p1 = fract(t * speed + n0 + 0.5);
     vec2 adv = fl * L * hair / size;
@@ -189,34 +211,19 @@ void main() {
     vec3 cb = texture2D(u_tex0, base).rgb;
     vec3 c0 = texture2D(u_tex0, uv0).rgb;
     vec3 c1 = texture2D(u_tex0, uv1).rgb;
-    // Akış saçın dışına (kuleye/gökyüzüne) taşmasın.
     c0 = mix(cb, c0, smoothstep(0.25, 0.75, hairOf(texture2D(u_tex1, uv0).r)));
     c1 = mix(cb, c1, smoothstep(0.25, 0.75, hairOf(texture2D(u_tex1, uv1).r)));
     float w0 = 1.0 - abs(2.0 * p0 - 1.0);
     vec3 col = c0 * w0 + c1 * (1.0 - w0);
 
-    // --- saçların üzerinden geçen sıcak ışık
+    // --- saçların üzerinden spiral boyunca yukarı süzülen sıcak ışık
     float hl = smoothstep(0.06, 0.32, col.r - col.b);
-    float sweep = pow(0.5 + 0.5 * sin((q.x * 0.7 + q.y * 0.9) * 5.0 - t * 0.7), 5.0);
-    float shimmer = 0.5 + 0.5 * sin(dot(q, fl) * 60.0 - t * 4.0);
-    col += col * hl * hair * (sweep * 1.1 + shimmer * 0.15);
+    float sweep = pow(0.5 + 0.5 * sin(px.y * k * 1.3 + t * 1.0 - rel * 2.2), 5.0);
+    float shimmer = 0.5 + 0.5 * sin(dot(q, fl) * 60.0 + t * 4.0);
+    col += col * hl * hair * (sweep * 1.0 + shimmer * 0.15);
 
-    // --- pencerelerde titreyen mum ışığı (hafif hale ile)
-    vec2 o = 14.0 / size;
-    float bloom = (texture2D(u_tex2, st + vec2(o.x, o.y)).g + texture2D(u_tex2, st + vec2(-o.x, o.y)).g +
-                   texture2D(u_tex2, st + vec2(o.x, -o.y)).g + texture2D(u_tex2, st + vec2(-o.x, -o.y)).g) * 0.25;
-    float wid = vnoise(q * 3.0) * 20.0;
-    float candle = 0.75 + 0.12 * sin(t * 9.0 + wid) + 0.08 * sin(t * 23.0 + wid * 1.7) + 0.05 * sin(t * 2.3 + wid);
-    float winOn = smoothstep(0.35, 0.6, vnoise(q * vec2(9.0, 6.0) + vec2(0.0, floor(t / 7.0) * 3.1)));
-    vec3 warm = vec3(1.0, 0.58, 0.22);
-    float inner = aux.g * aux.g * (1.0 - band);
-    bloom *= 1.0 - band;
-    col = mix(col, col * 0.4 + warm * 0.55 * candle, inner * 0.8 * (1.0 - hair));
-    col += warm * bloom * 0.25 * candle * (0.6 + 0.4 * winOn) * (1.0 - hair);
-
-    // --- kulenin arkasından dolanan teller (yalnızca gökyüzünde)
-    vec2 px = st * size;
-    vec4 back = orbitStrands(px, t, 1);
+    // --- kulenin arkasından dolanan tutamlar (yalnızca gökyüzünde)
+    vec4 back = spiralStrands(px, t, 1);
     col = mix(col, back.rgb, back.a * sky);
 
     // --- gökyüzünde parıldayan altın tozları
@@ -238,8 +245,8 @@ void main() {
     b = max(b, flock(P, t + 23.0, 0.29, 1.0, 0.58, 45.0, 1.25));
     col = mix(col, vec3(0.025, 0.03, 0.045), b * 0.92);
 
-    // --- kulenin önünden geçen dönen teller
-    vec4 front = orbitStrands(px, t, 0);
+    // --- kulenin önünden geçerek yükselen tutamlar
+    vec4 front = spiralStrands(px, t, 0);
     col = mix(col, front.rgb, front.a);
 
     // --- renk ve kenar karartma

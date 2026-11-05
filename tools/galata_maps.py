@@ -7,7 +7,7 @@
 
 Tel yönünün işareti (ileri/geri) yapı tensöründen gelmez; komşular arasında en
 iyi hizalanandan başlayarak yayılan bir ağaç (Prim) ile tutarlı hale getirilir,
-sonra her saç kütlesi genel olarak aşağı akacak şekilde çevrilir. İşaretin
+sonra her saç kütlesi genel olarak yukarı akacak şekilde çevrilir. İşaretin
 uyuşmadığı dikiş yerlerinde akış sönümlenir.
 """
 import heapq
@@ -111,11 +111,11 @@ for seed in order:
 
 fx, fy = tx * sign, ty * sign
 
-# Her saç kütlesi genel olarak aşağı aksın.
+# Her saç kütlesi genel olarak yukarı (zeminden gökyüzüne) aksın.
 hair_lab, hn = ndimage.label(hairg > 0.5)
 for i in range(1, hn + 1):
     m = hair_lab == i
-    if fy[m].mean() < 0:
+    if fy[m].mean() > 0:
         fx[m] *= -1
         fy[m] *= -1
 
