@@ -13,4 +13,6 @@
     <string name="job_clean">🧹  Temizlik yap</string>
     <string name="job_dance">💃  Dans et</string>
     <string name="job_sleep">😴  Uyu</string>
+    <string name="job_chaos">🌪  Kaos çıkar</string>
+    <string name="job_wardrobe">👗  Gardırop</string>
 </resources>

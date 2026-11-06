@@ -53,5 +53,8 @@ Ekranda keyfine göre dolaşan turuncu piksel karakter (Claude Code'un yürüyen
 - **Basılı tut → iş menüsü:** 🎨 Resim çiz (bere + şövale, resmi adım adım boyar), 🍳 Yemek yap (aşçı şapkası, kaynayan tencere → çorba), 🧹 Temizlik yap (süpürgeyle gezer, toz bulutları, parıltı), 💃 Dans et, 😴 Uyu.
 - Karaktere dokun → kalple zıplar.
 - Tutup sürükle → ekranın üstünde **✕** belirir; oraya bırak → küçülerek kapanır. Simgeye tekrar dokununca geri gelir.
+- **İsim:** İlk açılışta isim ister; 🎲 ile kendine isim uydurabilir.
+- **Gardırop (uygulamanın içi):** 6 kategori x 10 parça (şapka, gözlük, ceket, tişört, pantolon, ayakkabı), 10 hazır kombin, rastgele kombin, kombin kaydetme. Kıyafetler her pozda (yürüme, oturma, dans, tırmanma) otomatik yerine oturur (`Dresser.kt`).
+- **🌪 Kaos:** Ekrana domates ve yumurta fırlatır, sprey boyayla çizer, camı çatlatır; sonra sünger ile siler. Ekrandaki hiçbir şeye gerçekten dokunmaz; dokununca hemen temizliğe geçer.
 - "Diğer uygulamaların üzerinde göster" izni gerekir (ilk açılışta yönlendirir). Ekran kapanınca durur.
 - Kareler `app/src/main/assets/sprites.txt` dosyasında (16 sütun, metin olarak); `tools/sprite_preview.py` ile önizlenir.

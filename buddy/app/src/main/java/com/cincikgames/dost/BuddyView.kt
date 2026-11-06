@@ -20,7 +20,7 @@ import kotlin.math.sin
 @SuppressLint("ViewConstructor")
 class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float) : View(context) {
 
-    enum class Tool { NONE, BRUSH, SPOON, BROOM }
+    enum class Tool { NONE, BRUSH, SPOON, BROOM, SPRAY, HAMMER, SPONGE, TOMATO, EGG }
     enum class Hat { NONE, BERET, CHEF }
     enum class Prop { NONE, EASEL, POT, BOWL }
 
@@ -128,20 +128,24 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
         canvas.drawRect(x, y, x + pixel * s + 0.5f, y + pixel * s + 0.5f, paint)
     }
 
+    /** Giyilen kombin (iş şapkası takılıyken kendi şapkası gizlenir). */
+    var outfit = Outfit()
+
     private fun drawSprite(canvas: Canvas, left: Float, top: Float) {
-        val f = sprites.frames[frame] ?: sprites.frames.getValue("stand")
-        for (y in 0 until f.h) {
-            for (x in 0 until f.w) {
-                val c = f.pixels[y * f.w + x]
-                if (Color.alpha(c) == 0) {
-                    if (f.outline[y * f.w + x]) {
-                        val ox = left + x * pixel
-                        val oy = top + y * pixel
-                        canvas.drawRect(ox, oy, ox + pixel + 0.5f, oy + pixel + 0.5f, outlinePaint)
-                    }
+        val g = sprites.dresser.dress(frame, outfit, hideHat = hat != Hat.NONE)
+        val ox = left - g.ox * pixel
+        val oy = top - g.oy * pixel
+        for (y in 0 until g.h) {
+            for (x in 0 until g.w) {
+                val c = g.px[y * g.w + x]
+                val px = ox + x * pixel
+                val py = oy + y * pixel
+                if (c == 0) {
+                    if (g.outline[y * g.w + x]) canvas.drawRect(px, py, px + pixel + 0.5f, py + pixel + 0.5f, outlinePaint)
                     continue
                 }
-                cell(canvas, left, top, x.toFloat(), y.toFloat(), c)
+                paint.color = c
+                canvas.drawRect(px, py, px + pixel + 0.5f, py + pixel + 0.5f, paint)
             }
         }
     }
@@ -195,6 +199,28 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
                 cell(canvas, left, top, 17f, 11f, C_WOOD)
                 art(canvas, left, top, 16f + d, 12f, arrayOf("YYYYY", "Y.Y.Y"), mapOf('Y' to C_STRAW))
             }
+            Tool.SPRAY -> {
+                art(canvas, left, top, 16f, 3f, arrayOf(".W", "PP", "PP", "PP", "PP"), mapOf('W' to Color.WHITE, 'P' to paintColor))
+                if (toolPhase == 1) art(canvas, left, top, 18f, 2f, arrayOf("..p", ".p.", "p.p"), mapOf('p' to paintColor))
+            }
+            Tool.HAMMER -> {
+                if (toolPhase == 0) {
+                    cell(canvas, left, top, 16f, 6f, C_WOOD)
+                    cell(canvas, left, top, 16f, 5f, C_WOOD)
+                    cell(canvas, left, top, 16f, 4f, C_WOOD)
+                    art(canvas, left, top, 15f, 2f, arrayOf("GGGG", "GGGG"), mapOf('G' to C_METAL))
+                } else {
+                    cell(canvas, left, top, 16f, 8f, C_WOOD)
+                    cell(canvas, left, top, 17f, 8f, C_WOOD)
+                    cell(canvas, left, top, 18f, 8f, C_WOOD)
+                    art(canvas, left, top, 19f, 6f, arrayOf("GG", "GG", "GG", "GG"), mapOf('G' to C_METAL))
+                }
+            }
+            Tool.SPONGE -> art(canvas, left, top, 15f, 6f + d, arrayOf("YYYY", "YyYY", "YYyY", "GGGG"),
+                mapOf('Y' to C_SPONGE, 'y' to C_SPONGE_HOLE, 'G' to C_SPONGE_BACK))
+            Tool.TOMATO -> art(canvas, left, top, 15f, -1f, arrayOf(".gg.", "RRRR", "RRRR", ".RR."),
+                mapOf('g' to C_LEAF, 'R' to C_TOMATO))
+            Tool.EGG -> art(canvas, left, top, 15f, -1f, arrayOf(".WW.", "WWWW", "WWWW", ".WW."), mapOf('W' to C_EGG))
             Tool.NONE -> {}
         }
     }
@@ -345,6 +371,12 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
         private val C_BOWL = Color.parseColor("#F2E8CF")
         private val C_HEART = Color.parseColor("#FF5A7A")
         private val C_SPARKLE = Color.parseColor("#FFE27A")
+        private val C_SPONGE = Color.parseColor("#FFD54A")
+        private val C_SPONGE_HOLE = Color.parseColor("#E0A800")
+        private val C_SPONGE_BACK = Color.parseColor("#4CAF50")
+        private val C_TOMATO = Color.parseColor("#E63B2E")
+        private val C_LEAF = Color.parseColor("#2E9E4F")
+        private val C_EGG = Color.parseColor("#FFF8EC")
 
         private val EASEL = arrayOf(
             "FFFFFFFFFFFFFF",

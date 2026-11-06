@@ -48,6 +48,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
     private enum class State {
         WALK, IDLE, SIT, SLEEP, STRETCH, HOP, WAVE, DANCE, CLIMB, HANG,
         DRAG, FALL, MENU, PAINT, COOK, CLEAN, SHOWOFF, CLOSING,
+        CHAOS_MOVE, CHAOS_ACT, CHAOS_REST, CHAOS_CLEAN,
     }
 
     private enum class Walk { NORMAL, TO_WALL }
@@ -94,6 +95,20 @@ class BuddyService : Service(), Choreographer.FrameCallback {
     private var climbStartY = 0f
     private var climbTopY = 0f
 
+    // kaos
+    private var chaos: ChaosView? = null
+    private val chaosActs = ArrayList<String>()
+    private var chaosAct = ""
+    private var chaosDone = false
+
+    // ayarlar değişince (gardırop, isim) anında güncelle
+    private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            Store.KEY_OUTFIT -> { buddy.outfit = Store.outfit(this); buddy.invalidate() }
+            Store.KEY_NAME -> startInForeground()
+        }
+    }
+
     // işler
     private var cleanStops = 0
     private var puffTimer = 0f
@@ -108,7 +123,8 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         readScreen()
         startInForeground()
 
-        buddy = BuddyView(this, Sprites(this), pixel = 4.2f * d)
+        buddy = BuddyView(this, Sprites.get(this), pixel = 4.2f * d)
+        buddy.outfit = Store.outfit(this)
         target = CloseTargetView(this)
         val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         buddyLp = WindowManager.LayoutParams(
@@ -141,6 +157,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
             stopSelf()
             return
         }
+        Store.prefs(this).registerOnSharedPreferenceChangeListener(prefListener)
         registerReceiver(screenReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
@@ -165,6 +182,8 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         stopLoop()
         handler.removeCallbacksAndMessages(null)
         try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
+        Store.prefs(this).unregisterOnSharedPreferenceChangeListener(prefListener)
+        removeChaos()
         closeMenu()
         if (targetShown) try { wm.removeView(target) } catch (_: Exception) {}
         if (attached) try { wm.removeView(buddy) } catch (_: Exception) {}
@@ -221,6 +240,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         if (state != State.SLEEP) buddy.sleepy = (buddy.sleepy - dt * 2f).coerceAtLeast(0f)
         if (state != State.SHOWOFF) buddy.sparkle = (buddy.sparkle - dt * 2f).coerceAtLeast(0f)
         updatePuffs(dt)
+        chaos?.update(dt)
 
         when (state) {
             State.WALK -> {
@@ -365,6 +385,26 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                     afterShowoff?.invoke()
                     afterShowoff = null
                     chooseNext()
+                }
+            }
+            State.CHAOS_MOVE -> if (moveToGoal(dt)) beginChaosAct()
+            State.CHAOS_ACT -> updateChaosAct()
+            State.CHAOS_REST -> {
+                buddy.frame = blinkFrame("sit")
+                if (stateTime >= stateDur) beginChaosClean()
+            }
+            State.CHAOS_CLEAN -> {
+                val p = (stateTime / stateDur).coerceIn(0f, 1f)
+                chaos?.wipe = p
+                buddy.toolPhase = ((stateTime / 0.15f).toInt() % 2)
+                walkClock += dt * 2f
+                buddy.frame = if ((walkClock * 5.5f).toInt() % 2 == 0) "walk1" else "walk2"
+                x = p * screenW - buddy.spriteCx - buddy.spriteW * 0.1f
+                if (p >= 1f) {
+                    removeChaos()
+                    buddy.tool = BuddyView.Tool.NONE
+                    buddy.sparkle = 1f
+                    showoff(2.2f) { clearJob() }
                 }
             }
             State.CLOSING -> {
@@ -560,7 +600,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
 
     // ------------------------------------------------------------ işler
 
-    private fun inJob() = state == State.PAINT || state == State.COOK || state == State.CLEAN ||
+    private fun inJob() = state == State.PAINT || state == State.COOK || state == State.CLEAN || chaos != null ||
         (state == State.SHOWOFF && afterShowoff != null)
 
     private fun setPads(left: Float, right: Float) {
@@ -609,6 +649,11 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                 enter(State.CLEAN, 0f)
             }
             "dance" -> enter(State.DANCE, 6.5f)
+            "chaos" -> { startChaos(); return }
+            "wardrobe" -> {
+                startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                enter(State.WAVE, 1.4f)
+            }
             "sleep" -> enter(State.SLEEP, if (isNight()) 30f else 12f)
         }
         applyPosition()
@@ -646,9 +691,152 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         }
     }
 
+    // ------------------------------------------------------------ kaos
+
+    private fun startChaos() {
+        removeChaos()
+        clearJob()
+        buddy.rotationDeg = 0f
+        val v = ChaosView(this)
+        val lp = WindowManager.LayoutParams(
+            screenW, screenH, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        // Ekrana dokununca kaos hemen biter, temizliğe geçilir.
+        v.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) skipToClean()
+            true
+        }
+        try {
+            wm.addView(v, lp)
+        } catch (_: Exception) {
+            return
+        }
+        chaos = v
+        // karakter kaos katmanının üstünde kalsın
+        try {
+            wm.removeView(buddy)
+            wm.addView(buddy, buddyLp)
+        } catch (_: Exception) {}
+        chaosActs.clear()
+        val pool = mutableListOf("tomato", "egg", "spray", "crack")
+        pool += List(3) { listOf("tomato", "egg", "spray", "crack", "tomato", "egg").random(rnd) }
+        pool.shuffle(rnd)
+        chaosActs.addAll(pool)
+        nextChaosAct()
+    }
+
+    private fun nextChaosAct() {
+        if (chaosActs.isEmpty()) {
+            buddy.tool = BuddyView.Tool.NONE
+            heartLeft = HEART_TIME
+            enter(State.CHAOS_REST, 1.6f)
+            return
+        }
+        chaosAct = chaosActs.removeAt(0)
+        buddy.tool = when (chaosAct) {
+            "tomato" -> BuddyView.Tool.TOMATO
+            "egg" -> BuddyView.Tool.EGG
+            "spray" -> BuddyView.Tool.SPRAY
+            else -> BuddyView.Tool.HAMMER
+        }
+        buddy.toolPhase = 0
+        walkPurpose = Walk.NORMAL
+        pickGoal(lowerHalf = chaosAct != "crack", minDist = 120f)
+        speed = 260f * d
+        enter(State.CHAOS_MOVE, 0f)
+    }
+
+    private fun handX() = buddy.winX + buddy.spriteCx + (if (buddy.facingLeft) -1f else 1f) * buddy.spriteW * 0.55f
+    private fun handY() = buddy.winY + buddy.groundY - buddy.spriteH * 0.8f
+
+    private fun beginChaosAct() {
+        chaosDone = false
+        when (chaosAct) {
+            "spray" -> {
+                buddy.paintColor = BuddyView.PAINT_COLORS[rnd.nextInt(BuddyView.PAINT_COLORS.size)]
+                val cx = (buddy.winX + buddy.spriteCx).coerceIn(110f * d, screenW - 110f * d)
+                val cy = (buddy.winY - 120f * d).coerceIn(140f * d, screenH - 200f * d)
+                val dur = chaos?.startSpray(cx, cy) ?: 1f
+                enter(State.CHAOS_ACT, dur + 0.3f)
+            }
+            "crack" -> enter(State.CHAOS_ACT, 1.1f)
+            else -> {
+                // hedef: karakterden uzak, ekranın üst kısmında bir nokta
+                enter(State.CHAOS_ACT, 0.9f)
+            }
+        }
+    }
+
+    private fun updateChaosAct() {
+        val v = chaos ?: run { chooseNext(); return }
+        when (chaosAct) {
+            "tomato", "egg" -> {
+                buddy.frame = if (stateTime < 0.35f) "stretch" else "hop"
+                if (!chaosDone && stateTime >= 0.35f) {
+                    chaosDone = true
+                    val tx = 40f * d + rnd.nextFloat() * (screenW - 80f * d)
+                    val ty = 90f * d + rnd.nextFloat() * (screenH * 0.6f)
+                    buddy.facingLeft = tx < buddy.winX + buddy.spriteCx
+                    v.throwThing(chaosAct == "egg", handX(), handY(), tx, ty)
+                    buddy.tool = BuddyView.Tool.NONE
+                }
+                buddy.lift = if (stateTime > 0.35f) sin(((stateTime - 0.35f) / 0.55f).coerceIn(0f, 1f) * Math.PI.toFloat()) * buddy.pixel * 4f else 0f
+            }
+            "spray" -> {
+                buddy.toolPhase = ((stateTime / 0.12f).toInt() % 2)
+                buddy.frame = blinkFrame("stand")
+                v.sprayTip()?.let { (tx, _) -> buddy.facingLeft = tx < buddy.winX + buddy.spriteCx - 4f * d }
+            }
+            "crack" -> {
+                buddy.toolPhase = if (stateTime < 0.5f) 0 else 1
+                buddy.frame = if (stateTime < 0.5f) "stand" else "hop"
+                if (!chaosDone && stateTime >= 0.5f) {
+                    chaosDone = true
+                    val dir = if (buddy.facingLeft) -1f else 1f
+                    v.crack(buddy.winX + buddy.spriteCx + dir * buddy.spriteW * 0.9f, buddy.winY + buddy.groundY - buddy.spriteH * 0.6f)
+                }
+            }
+        }
+        if (stateTime >= stateDur) nextChaosAct()
+    }
+
+    private fun beginChaosClean() {
+        buddy.tool = BuddyView.Tool.SPONGE
+        buddy.facingLeft = false
+        y = (screenH - buddy.viewH - 90f * d)
+        x = -buddy.spriteCx
+        chaos?.wipe = 0f
+        enter(State.CHAOS_CLEAN, 2.6f)
+    }
+
+    private fun skipToClean() {
+        if (chaos == null || state == State.CHAOS_CLEAN) return
+        chaosActs.clear()
+        beginChaosClean()
+        stateDur = 1.6f
+    }
+
+    private fun removeChaos() {
+        val v = chaos ?: return
+        try { wm.removeView(v) } catch (_: Exception) {}
+        chaos = null
+    }
+
     // ------------------------------------------------------------ menü
 
     private fun openMenu() {
+        if (chaos != null) return
         closeMenu()
         if (state == State.CLIMB || state == State.HANG) {
             buddy.rotationDeg = 0f
@@ -664,7 +852,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
             setPadding((10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt(), (8 * d).toInt())
         }
         card.addView(TextView(this).apply {
-            text = getString(R.string.menu_title)
+            text = Store.displayName(this@BuddyService) + ": " + getString(R.string.menu_title)
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
@@ -673,6 +861,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         val items = listOf(
             R.string.job_paint to "paint", R.string.job_cook to "cook", R.string.job_clean to "clean",
             R.string.job_dance to "dance", R.string.job_sleep to "sleep",
+            R.string.job_chaos to "chaos", R.string.job_wardrobe to "wardrobe",
         )
         for ((label, job) in items) {
             card.addView(TextView(this).apply {
@@ -758,6 +947,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                         handler.removeCallbacks(longPress)
                         dragging = true
                         closeMenu()
+                        removeChaos()
                         clearJob()
                         if (buddy.rotationDeg != 0f) {
                             buddy.rotationDeg = 0f
@@ -872,7 +1062,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         )
         val n: Notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notif)
-            .setContentTitle(getString(R.string.app_name))
+            .setContentTitle(Store.displayName(this))
             .setContentText(getString(R.string.notif_text))
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, getString(R.string.notif_close), stop).build())

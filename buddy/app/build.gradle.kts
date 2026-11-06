@@ -11,8 +11,8 @@ android {
         applicationId = "com.cincikgames.dost"
         minSdk = 26
         targetSdk = 34
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "3").toInt()
-        versionName = "0.3." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "4").toInt()
+        versionName = "0.4." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     signingConfigs {
@@ -32,6 +32,10 @@ android {
     }
 
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -44,4 +48,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
 }
