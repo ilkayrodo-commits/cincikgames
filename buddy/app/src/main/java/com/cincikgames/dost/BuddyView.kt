@@ -120,6 +120,14 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
         canvas.drawRect(x, y, x + pixel + 0.5f, y + pixel + 0.5f, paint)
     }
 
+    /** Ölçekli hücre: s birim genişliğinde kare. */
+    private fun cellS(canvas: Canvas, left: Float, top: Float, ux: Float, uy: Float, color: Int, s: Float) {
+        paint.color = color
+        val x = left + ux * pixel
+        val y = top + uy * pixel
+        canvas.drawRect(x, y, x + pixel * s + 0.5f, y + pixel * s + 0.5f, paint)
+    }
+
     private fun drawSprite(canvas: Canvas, left: Float, top: Float) {
         val f = sprites.frames[frame] ?: sprites.frames.getValue("stand")
         for (y in 0 until f.h) {
@@ -194,8 +202,17 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
     private fun drawProp(canvas: Canvas, left: Float, top: Float) {
         when (prop) {
             Prop.EASEL -> {
-                val ox = if (propSide > 0) 19f else -17f
-                art(canvas, left, top, ox, -1f, EASEL, mapOf('F' to C_EASEL, 'W' to C_CANVAS))
+                // Şövale ve resim 1.5 kat büyük çizilir: karakter boyunda, resim net seçilsin.
+                val es = EASEL_SCALE
+                val ew = EASEL[0].length * es
+                val ox = if (propSide > 0) 19f else -3f - ew
+                val oy = 14f - EASEL.size * es   // tabanı karakterin ayaklarıyla aynı hizada
+                EASEL.forEachIndexed { y, r ->
+                    r.forEachIndexed { x, ch ->
+                        val c = when (ch) { 'F' -> C_EASEL; 'W' -> C_CANVAS; else -> null }
+                        if (c != null) cellS(canvas, left, top, ox + x * es, oy + y * es, c, es)
+                    }
+                }
                 val pic = picture ?: return
                 val w = pic[0].length
                 val shown = (paintProgress * pic.size * w).toInt()
@@ -204,7 +221,7 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
                     val rank = y * w + PAINT_ORDER[x % PAINT_ORDER.size]
                     if (rank < shown) {
                         val c = PICTURE_PALETTE[pic[y][x]]
-                        if (c != null) cell(canvas, left, top, ox + 1 + x, y.toFloat(), c)
+                        if (c != null) cellS(canvas, left, top, ox + (1 + x) * es, oy + (1 + y) * es, c, es)
                     }
                 }
             }
@@ -308,6 +325,9 @@ class BuddyView(context: Context, private val sprites: Sprites, val pixel: Float
 
     companion object {
         const val PUFF_LIFE = 0.7f
+        const val EASEL_SCALE = 1.5f
+        /** Resim çizerken şövale için açılan dolgu (piksel birimi). */
+        const val EASEL_PAD = 23f
         private val C_BERET = Color.parseColor("#8E1B2E")
         private val C_HAT_BAND = Color.parseColor("#D9D9D9")
         private val C_WOOD = Color.parseColor("#7A4A26")

@@ -579,7 +579,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
             "paint" -> {
                 val side = sideWithRoom()
                 buddy.propSide = side
-                if (side > 0) setPads(0f, 16f) else setPads(16f, 0f)
+                if (side > 0) setPads(0f, BuddyView.EASEL_PAD) else setPads(BuddyView.EASEL_PAD, 0f)
                 buddy.facingLeft = side < 0
                 buddy.hat = BuddyView.Hat.BERET
                 buddy.tool = BuddyView.Tool.BRUSH
