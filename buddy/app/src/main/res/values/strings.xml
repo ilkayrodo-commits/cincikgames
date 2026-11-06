@@ -5,6 +5,12 @@
     <string name="perm_button">İzni aç</string>
     <string name="perm_xiaomi">Xiaomi / Redmi / POCO telefonlarda ayrıca: Uygulama bilgisi → Diğer izinler → \"Arka planda açılır pencereleri göster\" seçeneğini de aç.</string>
     <string name="notif_channel">Minik Gezgin</string>
-    <string name="notif_text">Ekranında geziyor. Kapatmak için tutup ✕\'e sürükle.</string>
+    <string name="notif_text">Ekranında geziyor. Basılı tut: iş ver · Sürükle ✕: kapat</string>
     <string name="notif_close">Kapat</string>
+    <string name="menu_title">Ne yapayım? 🙂</string>
+    <string name="job_paint">🎨  Resim çiz</string>
+    <string name="job_cook">🍳  Yemek yap</string>
+    <string name="job_clean">🧹  Temizlik yap</string>
+    <string name="job_dance">💃  Dans et</string>
+    <string name="job_sleep">😴  Uyu</string>
 </resources>

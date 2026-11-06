@@ -12,15 +12,24 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.DisplayMetrics
 import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.TextView
+import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
@@ -29,33 +38,43 @@ import kotlin.random.Random
 
 /**
  * Ekranda gezen karakter. Diğer uygulamaların üzerinde küçük bir pencere olarak
- * durur; dokunmalar yalnızca karakterin üzerindeyse yakalanır, geri kalanı alttaki
- * ekrana geçer.
+ * durur; dokunmalar yalnızca karakterin üzerindeyse yakalanır.
+ *
+ * Basılı tutunca bir iş menüsü açılır (resim, yemek, temizlik, dans, uyku).
+ * Sürükleyince ekranın üstünde ✕ belirir; oraya bırakılınca kapanır.
  */
 class BuddyService : Service(), Choreographer.FrameCallback {
 
-    private enum class State { WALK, IDLE, SIT, SLEEP, HOP, DRAG, FALL, CLOSING }
+    private enum class State {
+        WALK, IDLE, SIT, SLEEP, STRETCH, HOP, WAVE, DANCE, CLIMB, HANG,
+        DRAG, FALL, MENU, PAINT, COOK, CLEAN, SHOWOFF, CLOSING,
+    }
+
+    private enum class Walk { NORMAL, TO_WALL }
 
     private lateinit var wm: WindowManager
     private lateinit var buddy: BuddyView
     private lateinit var target: CloseTargetView
     private lateinit var buddyLp: WindowManager.LayoutParams
     private lateinit var targetLp: WindowManager.LayoutParams
+    private var menu: View? = null
     private var attached = false
     private var targetShown = false
     private var running = false
+    private val handler = Handler(Looper.getMainLooper())
 
     private val rnd = Random(System.nanoTime())
     private var d = 1f
     private var screenW = 1
     private var screenH = 1
 
-    // karakterin "zemin" konumu: pencerenin sol üst köşesi
+    // (x, y): taban bölgesinin (dolgular hariç) sol üst köşesi, ekran pikseli
     private var x = 0f
     private var y = 0f
     private var goalX = 0f
     private var goalY = 0f
     private var speed = 0f
+    private var walkPurpose = Walk.NORMAL
     private var state = State.IDLE
     private var stateTime = 0f
     private var stateDur = 1f
@@ -68,6 +87,17 @@ class BuddyService : Service(), Choreographer.FrameCallback {
     private var lastNs = 0L
     private var t = 0f
     private var frameDt = 0.016f
+    private var greetPending = true
+
+    // tırmanma
+    private var wallLeft = true
+    private var climbStartY = 0f
+    private var climbTopY = 0f
+
+    // işler
+    private var cleanStops = 0
+    private var puffTimer = 0f
+    private var afterShowoff: (() -> Unit)? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -96,18 +126,18 @@ class BuddyService : Service(), Choreographer.FrameCallback {
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
 
-        // Ekranın alt kısmından, kenardan yürüyerek gelsin.
+        // Ekranın kenarından yürüyerek gelsin.
         x = if (rnd.nextBoolean()) -buddy.viewW.toFloat() else screenW.toFloat()
         y = screenH * (0.55f + rnd.nextFloat() * 0.25f)
         pickGoal()
-        state = State.WALK
+        speed = 70f * d
+        enter(State.WALK, 0f)
 
         setupTouch()
         try {
             wm.addView(buddy, buddyLp)
             attached = true
         } catch (e: Exception) {
-            // İzin yoksa (kullanıcı kaldırmış olabilir) sessizce kapan.
             stopSelf()
             return
         }
@@ -121,16 +151,21 @@ class BuddyService : Service(), Choreographer.FrameCallback {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             beginClose()
-        } else if (attached && state != State.CLOSING) {
-            // Simgeye tekrar dokunuldu: selam ver.
-            startHop(happy = true)
+        } else if (attached && state != State.CLOSING && !inJob()) {
+            // Simgeye tekrar dokunuldu: el salla.
+            closeMenu()
+            buddy.rotationDeg = 0f
+            clampToScreen()
+            enter(State.WAVE, 1.8f)
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         stopLoop()
+        handler.removeCallbacksAndMessages(null)
         try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
+        closeMenu()
         if (targetShown) try { wm.removeView(target) } catch (_: Exception) {}
         if (attached) try { wm.removeView(buddy) } catch (_: Exception) {}
         attached = false
@@ -140,6 +175,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         readScreen()
+        if (state == State.CLIMB || state == State.HANG) jumpOffWall()
         clampToScreen()
         pickGoal()
     }
@@ -181,26 +217,16 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         buddy.heart = if (heartLeft > 0f) 1f - heartLeft / HEART_TIME else 0f
         buddy.bob = 0f
         buddy.lift = 0f
+        if (state != State.DANCE) buddy.notes = (buddy.notes - dt * 2f).coerceAtLeast(0f)
+        if (state != State.SLEEP) buddy.sleepy = (buddy.sleepy - dt * 2f).coerceAtLeast(0f)
+        if (state != State.SHOWOFF) buddy.sparkle = (buddy.sparkle - dt * 2f).coerceAtLeast(0f)
+        updatePuffs(dt)
 
         when (state) {
             State.WALK -> {
-                val dx = goalX - x
-                val dy = goalY - y
-                val dist = hypot(dx, dy)
-                val step = speed * dt
-                if (dist <= step) {
-                    x = goalX
-                    y = goalY
-                    afterArrive()
-                } else {
-                    x += dx / dist * step
-                    y += dy / dist * step
-                    if (abs(dx) > 2f) buddy.facingLeft = dx < 0f
+                if (moveToGoal(dt)) {
+                    if (walkPurpose == Walk.TO_WALL) startClimb() else afterArrive()
                 }
-                walkClock += dt * (speed / (70f * d))
-                val phase = (walkClock * 5.5f).toInt() % 2
-                buddy.frame = if (phase == 0) "walk1" else "walk2"
-                buddy.bob = if (phase == 0) 0f else -buddy.pixel * 0.6f
             }
             State.IDLE -> {
                 buddy.frame = blinkFrame("stand")
@@ -213,18 +239,21 @@ class BuddyService : Service(), Choreographer.FrameCallback {
             State.SIT -> {
                 buddy.frame = if (stateTime < 0.25f) "stand" else blinkFrame("sit")
                 if (stateTime >= stateDur) {
-                    if (rnd.nextFloat() < 0.4f) enter(State.SLEEP, 5f + rnd.nextFloat() * 6f) else chooseNext()
+                    val sleepChance = if (isNight()) 0.85f else 0.4f
+                    if (rnd.nextFloat() < sleepChance) enter(State.SLEEP, sleepDuration()) else chooseNext()
                 }
             }
             State.SLEEP -> {
                 buddy.frame = "sit"
                 buddy.sleepy = min(1f, stateTime / 0.8f)
-                // nefes alırken hafifçe inip kalkar
                 buddy.bob = sin(t * 2.2f) * buddy.pixel * 0.35f
-                if (stateTime >= stateDur) {
-                    buddy.sleepy = 0f
-                    startHop(happy = false)
-                }
+                if (stateTime >= stateDur) enter(State.STRETCH, 1.5f)
+            }
+            State.STRETCH -> {
+                // uyanınca gerinir
+                buddy.frame = if (stateTime < 0.2f || stateTime > 1.3f) "stand" else "stretch"
+                buddy.lift = if (buddy.frame == "stretch") buddy.pixel * 0.8f else 0f
+                if (stateTime >= stateDur) chooseNext()
             }
             State.HOP -> {
                 val p = (stateTime / stateDur).coerceIn(0f, 1f)
@@ -232,19 +261,110 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                 buddy.frame = if (p < 0.1f || p > 0.9f) "stand" else if (heartLeft > 0f) "happy" else "hop"
                 if (p >= 1f) chooseNext()
             }
+            State.WAVE -> {
+                buddy.frame = if (((stateTime / 0.22f).toInt() % 2) == 0) "wave1" else "wave2"
+                if (stateTime >= stateDur) {
+                    enter(State.IDLE, 0.8f)
+                    lookFlipAt = -1f
+                }
+            }
+            State.DANCE -> {
+                val beat = (stateTime / 0.3f).toInt()
+                buddy.frame = if (beat % 2 == 0) "dance1" else "dance2"
+                buddy.bob = -abs(sin(stateTime * Math.PI.toFloat() / 0.3f)) * buddy.pixel * 1.2f
+                buddy.facingLeft = ((stateTime / 1.2f).toInt() % 2) == 1
+                buddy.notes = min(1f, stateTime * 2f)
+                if (stateTime >= stateDur) startHop(happy = true)
+            }
+            State.CLIMB -> {
+                y -= speed * dt
+                walkClock += dt * 1.6f
+                val phase = (walkClock * 5.5f).toInt() % 2
+                buddy.frame = if (phase == 0) "walk1" else "walk2"
+                if (y <= climbTopY) {
+                    y = climbTopY
+                    enter(State.HANG, 1.5f + rnd.nextFloat() * 1.5f)
+                }
+            }
+            State.HANG -> {
+                buddy.frame = blinkFrame("stand")
+                if (stateTime >= stateDur) jumpOffWall()
+            }
             State.DRAG -> {
                 buddy.frame = "dangle"
                 buddy.bob = sin(t * 9f) * buddy.pixel * 0.4f
                 updateTarget()
             }
             State.FALL -> {
-                // bırakılınca yere "düşer" (kısa bir yerçekimi)
                 fallVy += 2600f * d * dt
                 y += fallVy * dt
                 buddy.frame = "dangle"
                 if (y >= goalY) {
                     y = goalY
                     startHop(happy = false)
+                }
+            }
+            State.MENU -> {
+                buddy.frame = blinkFrame("stand")
+                if (stateTime > 9f) {
+                    closeMenu()
+                    chooseNext()
+                }
+            }
+            State.PAINT -> {
+                buddy.paintProgress = (stateTime / stateDur).coerceIn(0f, 1f)
+                buddy.toolPhase = ((stateTime / 0.22f).toInt() % 2)
+                buddy.frame = blinkFrame("stand")
+                // ara sıra geri çekilip eserine bakar
+                buddy.bob = if (((stateTime / 2.5f).toInt() % 3) == 2) buddy.pixel * 0.4f else 0f
+                if (stateTime >= stateDur) {
+                    buddy.paintProgress = 1f
+                    buddy.tool = BuddyView.Tool.NONE
+                    showoff(3.5f) { clearJob() }
+                }
+            }
+            State.COOK -> {
+                buddy.toolPhase = ((stateTime / 0.3f).toInt() % 2)
+                buddy.frame = blinkFrame("stand")
+                if (stateTime >= stateDur) {
+                    buddy.prop = BuddyView.Prop.BOWL
+                    buddy.tool = BuddyView.Tool.NONE
+                    showoff(3.5f) { clearJob() }
+                }
+            }
+            State.CLEAN -> {
+                buddy.toolPhase = ((stateTime / 0.18f).toInt() % 2)
+                if (moveToGoal(dt)) {
+                    cleanStops--
+                    if (cleanStops <= 0) {
+                        buddy.tool = BuddyView.Tool.NONE
+                        showoff(2.2f) { clearJob() }
+                        buddy.sparkle = 1f
+                    } else {
+                        pickGoal(lowerHalf = true, minDist = 110f)
+                    }
+                } else {
+                    puffTimer -= dt
+                    if (puffTimer <= 0f) {
+                        puffTimer = 0.09f
+                        emitPuff()
+                    }
+                }
+            }
+            State.SHOWOFF -> {
+                // önce sevinçle zıplar, sonra eserini gösterir
+                val hopT = 0.55f
+                if (stateTime < hopT) {
+                    buddy.lift = sin(stateTime / hopT * Math.PI.toFloat()) * buddy.pixel * 6f
+                    buddy.frame = "happy"
+                } else {
+                    buddy.frame = blinkFrame("happy")
+                }
+                if (buddy.sparkle > 0f) buddy.sparkle = (1f - (stateTime - stateDur + 0.6f).coerceAtLeast(0f) / 0.6f).coerceIn(0f, 1f)
+                if (stateTime >= stateDur) {
+                    afterShowoff?.invoke()
+                    afterShowoff = null
+                    chooseNext()
                 }
             }
             State.CLOSING -> {
@@ -258,9 +378,29 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                 }
             }
         }
-        if (state != State.SLEEP) buddy.sleepy = (buddy.sleepy - dt * 2f).coerceAtLeast(0f)
         applyPosition()
         buddy.invalidate()
+    }
+
+    /** Hedefe doğru yürür; vardıysa true. */
+    private fun moveToGoal(dt: Float): Boolean {
+        val dx = goalX - x
+        val dy = goalY - y
+        val dist = hypot(dx, dy)
+        val step = speed * dt
+        walkClock += dt * (speed / (70f * d))
+        val phase = (walkClock * 5.5f).toInt() % 2
+        buddy.frame = if (phase == 0) "walk1" else "walk2"
+        buddy.bob = if (phase == 0) 0f else -buddy.pixel * 0.6f
+        if (dist <= step) {
+            x = goalX
+            y = goalY
+            return true
+        }
+        x += dx / dist * step
+        y += dy / dist * step
+        if (abs(dx) > 2f) buddy.facingLeft = dx < 0f
+        return false
     }
 
     private fun blinkFrame(base: String): String {
@@ -282,23 +422,51 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         stateDur = dur
     }
 
+    private fun isNight(): Boolean {
+        val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return h >= 23 || h < 7
+    }
+
+    private fun sleepDuration(): Float =
+        if (isNight()) 15f + rnd.nextFloat() * 25f else 5f + rnd.nextFloat() * 6f
+
     private fun afterArrive() {
+        if (greetPending) {
+            greetPending = false
+            enter(State.WAVE, 1.8f)
+            return
+        }
         val r = rnd.nextFloat()
+        if (isNight()) {
+            when {
+                r < 0.35f -> enter(State.IDLE, 2f + rnd.nextFloat() * 3f)
+                r < 0.80f -> enter(State.SIT, 1.5f + rnd.nextFloat() * 2f)
+                else -> chooseNext()
+            }
+            return
+        }
         when {
-            r < 0.45f -> {
+            r < 0.34f -> {
                 enter(State.IDLE, 1.2f + rnd.nextFloat() * 2.8f)
                 lookFlipAt = if (rnd.nextFloat() < 0.6f) stateDur * (0.3f + rnd.nextFloat() * 0.4f) else -1f
             }
-            r < 0.62f -> startHop(happy = rnd.nextFloat() < 0.3f)
-            r < 0.80f -> enter(State.SIT, 2.5f + rnd.nextFloat() * 3f)
+            r < 0.46f -> startHop(happy = rnd.nextFloat() < 0.3f)
+            r < 0.62f -> enter(State.SIT, 2.5f + rnd.nextFloat() * 3f)
+            r < 0.70f -> enter(State.DANCE, 4f + rnd.nextFloat() * 3f)
+            r < 0.79f -> goToWall()
             else -> chooseNext()
         }
     }
 
     private fun chooseNext() {
+        walkPurpose = Walk.NORMAL
         pickGoal()
-        // ara sıra koşar
-        speed = (if (rnd.nextFloat() < 0.15f) 150f else 55f + rnd.nextFloat() * 35f) * d
+        val night = isNight()
+        speed = when {
+            night -> 40f
+            rnd.nextFloat() < 0.15f -> 150f
+            else -> 55f + rnd.nextFloat() * 35f
+        } * d
         enter(State.WALK, 0f)
     }
 
@@ -307,39 +475,253 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         enter(State.HOP, 0.55f)
     }
 
-    private fun pickGoal() {
-        val minX = 0f
-        val maxX = (screenW - buddy.viewW).toFloat()
-        val minY = 70f * d
+    private fun pickGoal(lowerHalf: Boolean = false, minDist: Float = 160f) {
+        val minX = buddy.padL * buddy.pixel
+        val maxX = (screenW - buddy.viewW).toFloat() + buddy.padL * buddy.pixel
+        val minY = if (lowerHalf) screenH * 0.35f else 70f * d
         val maxY = (screenH - buddy.viewH - 70f * d)
-        // tercihen uzak bir hedef: ekranı tur atsın
         var gx: Float
         var gy: Float
         var tries = 0
         do {
-            gx = minX + rnd.nextFloat() * (maxX - minX)
-            gy = minY + rnd.nextFloat() * (maxY - minY)
+            gx = minX + rnd.nextFloat() * (maxX - minX).coerceAtLeast(1f)
+            gy = minY + rnd.nextFloat() * (maxY - minY).coerceAtLeast(1f)
             tries++
-        } while (hypot(gx - x, gy - y) < 160f * d && tries < 8)
+        } while (hypot(gx - x, gy - y) < minDist * d && tries < 8)
         goalX = gx
         goalY = gy
-        if (speed == 0f) speed = 70f * d
     }
 
     private fun clampToScreen() {
-        x = x.coerceIn(0f, (screenW - buddy.viewW).toFloat().coerceAtLeast(0f))
+        val minX = buddy.padL * buddy.pixel
+        val maxX = (screenW - buddy.viewW).toFloat() + buddy.padL * buddy.pixel
+        x = x.coerceIn(minX, maxX.coerceAtLeast(minX))
         y = y.coerceIn(0f, (screenH - buddy.viewH).toFloat().coerceAtLeast(0f))
     }
 
     private fun applyPosition() {
         if (!attached) return
-        val nx = x.toInt()
+        val nx = (x - buddy.padL * buddy.pixel).toInt()
         val ny = y.toInt()
-        if (nx != buddyLp.x || ny != buddyLp.y) {
+        val nw = buddy.viewW
+        val nh = buddy.viewH
+        buddy.winX = nx.toFloat()
+        buddy.winY = ny.toFloat()
+        if (nx != buddyLp.x || ny != buddyLp.y || nw != buddyLp.width || nh != buddyLp.height) {
+            val resized = nw != buddyLp.width || nh != buddyLp.height
             buddyLp.x = nx
             buddyLp.y = ny
+            buddyLp.width = nw
+            buddyLp.height = nh
+            if (resized) buddy.requestLayout()
             try { wm.updateViewLayout(buddy, buddyLp) } catch (_: Exception) {}
         }
+    }
+
+    // ------------------------------------------------------------ duvar
+
+    private fun goToWall() {
+        wallLeft = (x + buddy.viewW / 2f) < screenW / 2f
+        goalX = if (wallLeft) 0f else (screenW - buddy.viewW).toFloat()
+        goalY = y
+        walkPurpose = Walk.TO_WALL
+        speed = 70f * d
+        enter(State.WALK, 0f)
+    }
+
+    private fun startClimb() {
+        walkPurpose = Walk.NORMAL
+        val half = buddy.spriteH / 2f
+        val cx = buddy.spriteCx
+        // Ayaklar duvara değsin: döndürülmüş karakterin tabanı ekran kenarında.
+        if (wallLeft) {
+            buddy.rotationDeg = 90f
+            buddy.facingLeft = true
+            x = half - cx
+        } else {
+            buddy.rotationDeg = -90f
+            buddy.facingLeft = false
+            x = screenW - cx - half
+        }
+        climbStartY = y
+        climbTopY = (y - (180f + rnd.nextFloat() * 260f) * d).coerceAtLeast(90f * d)
+        speed = 45f * d
+        enter(State.CLIMB, 0f)
+    }
+
+    private fun jumpOffWall() {
+        buddy.rotationDeg = 0f
+        buddy.facingLeft = !wallLeft
+        x = if (wallLeft) 8f * d else (screenW - buddy.viewW).toFloat() - 8f * d
+        goalY = climbStartY.coerceAtMost((screenH - buddy.viewH - 40f * d))
+        fallVy = -500f * d
+        enter(State.FALL, 0f)
+    }
+
+    // ------------------------------------------------------------ işler
+
+    private fun inJob() = state == State.PAINT || state == State.COOK || state == State.CLEAN ||
+        (state == State.SHOWOFF && afterShowoff != null)
+
+    private fun setPads(left: Float, right: Float) {
+        buddy.padL = left
+        buddy.padR = right
+        clampToScreen()
+    }
+
+    private fun sideWithRoom(): Int = if (x + buddy.viewW / 2f > screenW / 2f) -1 else 1
+
+    private fun startJob(job: String) {
+        closeMenu()
+        clearJob()
+        buddy.rotationDeg = 0f
+        when (job) {
+            "paint" -> {
+                val side = sideWithRoom()
+                buddy.propSide = side
+                if (side > 0) setPads(0f, 16f) else setPads(16f, 0f)
+                buddy.facingLeft = side < 0
+                buddy.hat = BuddyView.Hat.BERET
+                buddy.tool = BuddyView.Tool.BRUSH
+                buddy.prop = BuddyView.Prop.EASEL
+                val i = rnd.nextInt(BuddyView.PICTURES.size)
+                buddy.picture = BuddyView.PICTURES[i]
+                buddy.paintColor = BuddyView.PAINT_COLORS[i]
+                buddy.paintProgress = 0f
+                enter(State.PAINT, 10f)
+            }
+            "cook" -> {
+                val side = sideWithRoom()
+                buddy.propSide = side
+                if (side > 0) setPads(0f, 12f) else setPads(12f, 0f)
+                buddy.facingLeft = side < 0
+                buddy.hat = BuddyView.Hat.CHEF
+                buddy.tool = BuddyView.Tool.SPOON
+                buddy.prop = BuddyView.Prop.POT
+                enter(State.COOK, 8f)
+            }
+            "clean" -> {
+                setPads(7f, 7f)
+                buddy.tool = BuddyView.Tool.BROOM
+                cleanStops = 4
+                speed = 62f * d
+                pickGoal(lowerHalf = true, minDist = 110f)
+                enter(State.CLEAN, 0f)
+            }
+            "dance" -> enter(State.DANCE, 6.5f)
+            "sleep" -> enter(State.SLEEP, if (isNight()) 30f else 12f)
+        }
+        applyPosition()
+    }
+
+    private fun showoff(dur: Float, then: () -> Unit) {
+        heartLeft = HEART_TIME
+        afterShowoff = then
+        enter(State.SHOWOFF, dur)
+    }
+
+    private fun clearJob() {
+        buddy.tool = BuddyView.Tool.NONE
+        buddy.hat = BuddyView.Hat.NONE
+        buddy.prop = BuddyView.Prop.NONE
+        buddy.picture = null
+        afterShowoff = null
+        setPads(0f, 0f)
+    }
+
+    private fun emitPuff() {
+        val dir = if (buddy.facingLeft) -1f else 1f
+        val lx = buddy.spriteCx + dir * (buddy.spriteW / 2f + buddy.pixel * 2.5f)
+        val ly = buddy.groundY - buddy.pixel
+        buddy.puffs.add(BuddyView.Puff(buddy.winX + lx, buddy.winY + ly))
+    }
+
+    private fun updatePuffs(dt: Float) {
+        if (buddy.puffs.isEmpty()) return
+        val it = buddy.puffs.iterator()
+        while (it.hasNext()) {
+            val p = it.next()
+            p.age += dt
+            if (p.age > BuddyView.PUFF_LIFE) it.remove()
+        }
+    }
+
+    // ------------------------------------------------------------ menü
+
+    private fun openMenu() {
+        closeMenu()
+        if (state == State.CLIMB || state == State.HANG) {
+            buddy.rotationDeg = 0f
+            clampToScreen()
+        }
+        clearJob()
+        enter(State.MENU, 0f)
+        buddy.facingLeft = false
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.menu_bg)
+            setPadding((10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt(), (8 * d).toInt())
+        }
+        card.addView(TextView(this).apply {
+            text = getString(R.string.menu_title)
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setPadding((8 * d).toInt(), 0, (8 * d).toInt(), (6 * d).toInt())
+        })
+        val items = listOf(
+            R.string.job_paint to "paint", R.string.job_cook to "cook", R.string.job_clean to "clean",
+            R.string.job_dance to "dance", R.string.job_sleep to "sleep",
+        )
+        for ((label, job) in items) {
+            card.addView(TextView(this).apply {
+                text = getString(label)
+                textSize = 15f
+                setTextColor(0xFFF1F1F4.toInt())
+                setBackgroundResource(R.drawable.menu_item_bg)
+                setPadding((10 * d).toInt(), (9 * d).toInt(), (22 * d).toInt(), (9 * d).toInt())
+                isClickable = true
+                setOnClickListener { startJob(job) }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        card.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                closeMenu()
+                if (state == State.MENU) chooseNext()
+            }
+            false
+        }
+        card.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val mw = card.measuredWidth
+        val mh = card.measuredHeight
+        val bx = buddy.winX + buddy.spriteCx
+        val btop = buddy.winY + buddy.groundY - buddy.spriteH
+        var my = btop - mh - 6f * d
+        if (my < 40f * d) my = buddy.winY + buddy.viewH + 6f * d
+        my = my.coerceAtMost(screenH - mh - 20f * d)
+        val lp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            this.x = (bx - mw / 2f).coerceIn(8f * d, (screenW - mw - 8f * d).coerceAtLeast(8f * d)).toInt()
+            this.y = my.toInt()
+        }
+        try {
+            wm.addView(card, lp)
+            menu = card
+        } catch (_: Exception) {}
+    }
+
+    private fun closeMenu() {
+        val m = menu ?: return
+        try { wm.removeView(m) } catch (_: Exception) {}
+        menu = null
     }
 
     // ------------------------------------------------------------ dokunma
@@ -352,6 +734,11 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         var startX = 0f
         var startY = 0f
         var dragging = false
+        var longPressed = false
+        val longPress = Runnable {
+            longPressed = true
+            openMenu()
+        }
         buddy.setOnTouchListener { _, e ->
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -360,13 +747,24 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                     startX = x
                     startY = y
                     dragging = false
+                    longPressed = false
+                    handler.postDelayed(longPress, 450L)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val mx = e.rawX - downX
                     val my = e.rawY - downY
-                    if (!dragging && hypot(mx, my) > slop) {
+                    if (!dragging && !longPressed && hypot(mx, my) > slop) {
+                        handler.removeCallbacks(longPress)
                         dragging = true
+                        closeMenu()
+                        clearJob()
+                        if (buddy.rotationDeg != 0f) {
+                            buddy.rotationDeg = 0f
+                            clampToScreen()
+                            startX = x
+                            startY = y
+                        }
                         enter(State.DRAG, 0f)
                         buddy.sleepy = 0f
                         showTarget()
@@ -379,20 +777,25 @@ class BuddyService : Service(), Choreographer.FrameCallback {
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(longPress)
                     if (dragging) {
                         val close = target.active
                         hideTarget()
                         if (close) {
                             beginClose()
                         } else {
-                            // bırakıldığı yerin biraz altına düşsün
                             goalY = (y + 24f * d).coerceAtMost((screenH - buddy.viewH - 40f * d))
                             fallVy = 0f
                             enter(State.FALL, 0f)
                         }
-                    } else {
-                        // dokunuldu: sevinçle zıpla
-                        startHop(happy = true)
+                    } else if (!longPressed && e.actionMasked == MotionEvent.ACTION_UP) {
+                        if (inJob()) {
+                            heartLeft = HEART_TIME      // iş başındayken sadece kalp
+                        } else if (state != State.MENU) {
+                            buddy.rotationDeg = 0f
+                            clampToScreen()
+                            startHop(happy = true)
+                        }
                     }
                     dragging = false
                     true
@@ -402,8 +805,7 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         }
     }
 
-    private fun targetCenter(): Pair<Float, Float> =
-        Pair(screenW / 2f, 110f * d)
+    private fun targetCenter(): Pair<Float, Float> = Pair(screenW / 2f, 110f * d)
 
     private fun showTarget() {
         if (targetShown) return
@@ -428,18 +830,17 @@ class BuddyService : Service(), Choreographer.FrameCallback {
         if (!targetShown) return
         target.appear = min(1f, target.appear + 0.12f)
         val (cx, cy) = targetCenter()
-        val bx = x + buddy.viewW / 2f
-        val by = y + buddy.viewH * 0.6f
+        val bx = buddy.winX + buddy.spriteCx
+        val by = buddy.winY + buddy.viewH * 0.6f
         target.active = hypot(bx - cx, by - cy) < 85f * d
     }
 
     private fun beginClose() {
         if (state == State.CLOSING) return
         hideTarget()
+        closeMenu()
         enter(State.CLOSING, 0.35f)
-        if (!running) {
-            stopSelf()
-        }
+        if (!running) stopSelf()
     }
 
     // ------------------------------------------------------------ yardımcılar

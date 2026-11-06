@@ -49,7 +49,8 @@ https://github.com/ilkayrodo-commits/cincikgames/releases/latest
 
 Ekranda keyfine göre dolaşan turuncu piksel karakter (Claude Code'un yürüyen karakterinden esinlenen özgün çizim).
 
-- Simgeye dokun → karakter ekrana çıkar: yürür, durup bakınır, göz kırpar, zıplar, oturur, uyuklar (z z z).
+- Simgeye dokun → karakter ekrana çıkar ve el sallar: yürür, bakınır, göz kırpar, zıplar, dans eder, duvara tırmanır, oturur, uyuklar (z z z), uyanınca gerinir. Gece (23–07) daha çok uyur.
+- **Basılı tut → iş menüsü:** 🎨 Resim çiz (bere + şövale, resmi adım adım boyar), 🍳 Yemek yap (aşçı şapkası, kaynayan tencere → çorba), 🧹 Temizlik yap (süpürgeyle gezer, toz bulutları, parıltı), 💃 Dans et, 😴 Uyu.
 - Karaktere dokun → kalple zıplar.
 - Tutup sürükle → ekranın üstünde **✕** belirir; oraya bırak → küçülerek kapanır. Simgeye tekrar dokununca geri gelir.
 - "Diğer uygulamaların üzerinde göster" izni gerekir (ilk açılışta yönlendirir). Ekran kapanınca durur.
